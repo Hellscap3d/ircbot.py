@@ -7,6 +7,22 @@ import colorama
 colorama.init()
 class IRCRegistrationTimeout(Exception):pass
 
+class Embed():
+  def __init__(self, data):
+    self.data = data
+  def send(self, bot, channel):
+    lines = []
+    lines.append("="*25)
+    lines.append("||" + self.data["title"] + " "*(21-len(self.data["title"])) + "||")
+    lines.append("||" + self.data["description"] + " "*(21-len(self.data["description"])) + "||")
+    for field in self.data["fields"]:
+      lines.append("||" + field["name"] + " "*(21-len(field["name"])) + "||")
+      lines.append("||" + field["value"] + " "*(21-len(field["value"])) + "||")
+    lines.append("="*25)
+    for line in lines:
+      bot.send(channel.id, line)
+      
+
 class Message():
   def __init__(self,bot,message,channel,user):
     message = message[1:]
@@ -24,11 +40,14 @@ class Channel():
 
 class User():
   def __init__(self,bot,user):
+    print(user)
     user = user.split("!")[1].split("@")
     self.host = user[1] 
     self.name = user[0]
+    self.id = None
     self.bot = bot
   def send(self,message):
+    print(self.name)
     self.bot.send(self.name,message)
 
 class IRCThread(threading.Thread):
@@ -51,15 +70,30 @@ class IRCThread(threading.Thread):
               if response == "":
                 continue
               if response.startswith("ERROR"):
-                print(response[20:].split(" ")[0])
                 if response.find("(Registration Timeout)"):
                   raise IRCRegistrationTimeout()
+                else:
+                    # No matter what, an error is fatal
+                    raise
               if response.split(" ")[1] == "PRIVMSG":
                 args = response.split(" ")
+                
                 channel = Channel(self.bot,args[2])
                 user = User(self.bot,args[0])
-                message = Message(self.bot,args[3],channel,user)
-    
+                print(f"[IRCBOT INCOMING] Message from {user.name} in {channel.id}")
+                messagecontent = ""
+                for i in range(0,len(args) - 3):
+                  if i == 0:
+                    messagecontent = messagecontent + args[i + 3]
+                    continue
+                  if not i == len(args) - 3:
+                    messagecontent = messagecontent + " " + args[i + 3]
+                  else:
+                    continue
+                if not channel.id.startswith("#"):
+                  channel = user
+                message = Message(self.bot,messagecontent,channel,user)
+                # found the issue
                 self.bot.on_message(message)
                 
 
